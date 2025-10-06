@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Card Game with Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: blueviolet;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .game-container {
+      background: burlywood;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 30px 40px;
+      width: 100%;
+      max-width: 600px;
+      text-align: center;
+      position: relative;
+    }
+    .game-title {
+      color: #333;
+      margin: 0 0 25px;
+    }
+    .login-form {
+      margin: 20px auto;
+      max-width: 300px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 25px 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    }
+    .grid-container {
+      display: none;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 25px auto;
+      transition: all 0.3s;
+    }
+    .card {
+      height: 90px;
+      background: #f8f9fa;
+      border-radius: 5px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 38px;
+      cursor: pointer;
+      transition: background 0.2s;
+      user-select: none;
+      position: relative;
+      border: 1px solid #ececec;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .card.flipped, .card.matched {
+      background: grey;
+      cursor: default;
+    }
+    .card .front, .card .back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 5px;
+      transition: opacity .3s;
+    }
+    .card .front {
+      background: rgb(194, 32, 32);
+      opacity: 1;
+      z-index: 2;
+    }
+    .card.flipped .front, .card.matched .front {
+      opacity: 0;
+      z-index: 1;
+    }
+    .card .back {
+      background: #fffbe8;
+      opacity: 0;
+      font-size: 38px;
+      z-index: 1;
+      cursor: pointer;
+    }
+    .card.flipped .back, .card.matched .back {
+      opacity: 1;
+      z-index: 2;
+      cursor: default;
+    }
+    .score-display {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #555;
+    }
+    .input-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    .login-btn, .guest-btn {
+      width: 100%;
+      padding: 10px 0;
+      margin-top: 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .login-btn {
+      background: #1877f2;
+      color: white;
+    }
+    .login-btn:hover {
+      background: #166fe5;
+    }
+    .guest-btn {
+      background: #42b72a;
+      color: white;
+      margin-top: 10px;
+    }
+    .guest-btn:hover {
+      background: #36a420;
+    }
+    @media (max-width: 600px) {
+      .game-container {
+        max-width: 98vw;
+        padding: 20px 5vw;
+      }
+      .grid-container {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 7px;
+      }
+      .card {
+        font-size: 28px;
+        height: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1 class="game-title">Memory Card Game</h1>
+    <form class="login-form" id="loginForm" autocomplete="off">
+      <h2>Welcome!</h2>
+      <div class="input-group">
+        <label for="username">Username</label>
+        <input 
+          type="text" 
+          id="username"
+          required
+          pattern="[A-Za-z]+"
+          title="Username must contain only letters (no numbers, special characters, or spaces)">
+      </div>
+      <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" required>
+      </div>
+      <button type="submit" class="login-btn">Login</button>
+      <button type="button" class="guest-btn" id="guestBtn">Play as Guest</button>
+    </form>
+    <div class="grid-container" id="gameGrid"></div>
+    <div class="score-display">Score: <span class="score">0</span></div>
+  </div>
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const guestBtn = document.getElementById('guestBtn');
+    const gameGrid = document.getElementById('gameGrid');
+    const scoreDisplay = document.querySelector('.score');
+    let score = 0;
+    let matchedPairs = 0;
+
+    const emojis = ['🍎','🍌','🍒','🍓','🍊','🍋','🍉','🍇'];
+    let cardsArray = [];
+    let firstCard = null, secondCard = null, canFlip = true;
+
+    function shuffle(array) {
+      for(let i=array.length-1; i>0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
+        [array[i],array[j]] = [array[j],array[i]];
+      }
+      return array;
+    }
+
+    function startGame() {
+      score = 0;
+      matchedPairs = 0;
+      scoreDisplay.textContent = score;
+      firstCard = null;
+      secondCard = null;
+      canFlip = true;
+      gameGrid.innerHTML = '';
+      cardsArray = shuffle([...emojis, ...emojis]);
+      cardsArray.forEach((emoji, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.setAttribute('data-emoji', emoji);
+        card.setAttribute('data-index', idx);
+
+        const front = document.createElement('div');
+        front.className = 'front';
+        front.textContent = '❓';
+
+        const back = document.createElement('div');
+        back.className = 'back';
+        back.textContent = emoji;
+
+        card.appendChild(front);
+        card.appendChild(back);
+
+        card.addEventListener('click', () => flipCard(card));
+        gameGrid.appendChild(card);
+      });
+    }
+
+    function flipCard(card) {
+      if (canFlip === false) return;
+      if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+      card.classList.add('flipped');
+      if (!firstCard) {
+        firstCard = card;
+        return;
+      }
+      secondCard = card;
+      canFlip = false;
+
+      if (firstCard.getAttribute('data-emoji') === secondCard.getAttribute('data-emoji')) {
+        setTimeout(() => {
+          firstCard.classList.add('matched');
+          secondCard.classList.add('matched');
+          score += 10;
+          matchedPairs += 1;
+          scoreDisplay.textContent = score;
+          firstCard = null;
+          secondCard = null;
+          canFlip = true;
+          if (matchedPairs === emojis.length) {
+            setTimeout(() => {
+              alert('Congratulations! Game finished.\nFinal Score: ' + score);
+              startGame();
+            }, 300);
+          }
+        }, 600);
+      } else {
+        setTimeout(() => {
+          firstCard.classList.remove('flipped');
+          secondCard.classList.remove('flipped');
+          score = Math.max(score - 2, 0);
+          scoreDisplay.textContent = score;
+          firstCard = null;
+          secondCard = null;
+          canFlip = true;
+        }, 900);
+      }
+    }
+
+    loginForm.addEventListener('submit', function(e) {
+      const username = document.getElementById('username').value;
+      if (!/^[A-Za-z]+$/.test(username)) {
+        alert('Invalid username. Only letters are allowed. No numbers, spaces, or special characters.');
+        e.preventDefault();
+        document.getElementById('username').focus();
+        return;
+      }
+      e.preventDefault();
+      loginForm.style.display = 'none';
+      gameGrid.style.display = 'grid';
+      startGame();
+    });
+    guestBtn.addEventListener('click', function() {
+      loginForm.style.display = 'none';
+      gameGrid.style.display = 'grid';
+      startGame();
+    });
+  </script>
+</body>
+</html>
